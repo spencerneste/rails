@@ -128,6 +128,10 @@ module ActiveRecord
 
       mattr_accessor :connection_handlers, instance_accessor: false, default: {}
 
+      mattr_accessor :writing_role, instance_accessor: false, default: :writing
+
+      mattr_accessor :reading_role, instance_accessor: false, default: :reading
+
       class_attribute :default_connection_handler, instance_writer: false
 
       def self.connection_handler
