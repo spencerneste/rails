@@ -126,17 +126,20 @@ module ActiveRecord
 
       mattr_accessor :belongs_to_required_by_default, instance_accessor: false
 
+      mattr_accessor :connection_handlers, instance_accessor: false, default: {}
+
       class_attribute :default_connection_handler, instance_writer: false
 
       def self.connection_handler
-        ActiveRecord::RuntimeRegistry.connection_handler || default_connection_handler
+        Thread.current.thread_variable_get("ar_connection_handler") || default_connection_handler
       end
 
       def self.connection_handler=(handler)
-        ActiveRecord::RuntimeRegistry.connection_handler = handler
+        Thread.current.thread_variable_set("ar_connection_handler", handler)
       end
 
       self.default_connection_handler = ConnectionAdapters::ConnectionHandler.new
+      self.connection_handlers = { writing: ActiveRecord::Base.default_connection_handler }
     end
 
     module ClassMethods # :nodoc:

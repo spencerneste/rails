@@ -165,6 +165,12 @@ module ActiveRecord
 
   autoload :TestFixtures, "active_record/fixtures"
 
+  singleton_class.attr_accessor :writing_role
+  self.writing_role = :writing
+
+  singleton_class.attr_accessor :reading_role
+  self.reading_role = :reading
+
   def self.eager_load!
     super
     ActiveRecord::Locking.eager_load!
