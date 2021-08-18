@@ -2,6 +2,7 @@
 
 require "active_support/core_ext/hash/indifferent_access"
 require "active_support/core_ext/string/filters"
+require "active_record/database_configurations"
 require "concurrent/map"
 
 module ActiveRecord
@@ -51,7 +52,7 @@ module ActiveRecord
       #      }
       #   }
       def self.configurations=(config)
-        @@configurations = ActiveRecord::ConnectionHandling::MergeAndResolveDefaultUrlConfig.new(config).resolve
+        @@configurations = ActiveRecord::DatabaseConfigurations.new(config)
       end
       self.configurations = {}
 
