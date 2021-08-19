@@ -100,7 +100,7 @@ module ActiveRecord
     #
     # It is not recommended for use as it re-establishes a connection every
     # time it is called.
-    def connected_to(database: nil, role: nil, prevent_writes: false, &blk)
+    def connected_to(database: nil, role: nil, &blk)
       if database && role
         raise ArgumentError, "connected_to can only accept a `database` or a `role` argument, but not both arguments."
       elsif database
@@ -116,11 +116,7 @@ module ActiveRecord
 
         with_handler(role, &blk)
       elsif role
-        prevent_writes = true if role == reading_role
-
-        with_handler(role.to_sym) do
-          connection_handler.while_preventing_writes(prevent_writes, &blk)
-        end
+        with_handler(role.to_sym, &blk)
       else
         raise ArgumentError, "must provide a `database` or a `role`."
       end
