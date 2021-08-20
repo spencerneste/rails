@@ -309,11 +309,12 @@ module ActiveRecord
         def each_current_configuration(environment)
           environments = [environment]
           environments << "test" if environment == "development"
+          environments.each do |env|
+            ActiveRecord::Base.configurations.configs_for(env_name: env).each do |configuration|
+              next unless configuration.config["database"]
 
-          ActiveRecord::Base.configurations.slice(*environments).each do |configuration_environment, configuration|
-            next unless configuration["database"]
-
-            yield configuration, configuration_environment
+              yield configuration.config, configuration.env_name
+            end
           end
         end
 
