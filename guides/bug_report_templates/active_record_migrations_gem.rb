@@ -13,8 +13,8 @@ gemfile(true) do
   git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
   # Activate the gem you are reporting the issue against.
-  gem "activerecord", "5.2.0.rc1"
-  gem "sqlite3"
+  gem "activerecord", "5.2.0"
+  gem "sqlite3", "~> 1.3.6"
 end
 
 require "active_record"
@@ -37,7 +37,7 @@ end
 class Payment < ActiveRecord::Base
 end
 
-class ChangeAmountToAddScale < ActiveRecord::Migration[5.1]
+class ChangeAmountToAddScale < ActiveRecord::Migration[5.2]
   def change
     reversible do |dir|
       dir.up do

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/string/zones"
 require "active_support/core_ext/time/zones"
 
 module ActiveModel
@@ -18,18 +19,6 @@ module ActiveModel
           end
 
           value
-        end
-
-        def is_utc?
-          ::Time.zone_default.nil? || ::Time.zone_default =~ "UTC"
-        end
-
-        def default_timezone
-          if is_utc?
-            :utc
-          else
-            :local
-          end
         end
 
         def apply_seconds_precision(value)

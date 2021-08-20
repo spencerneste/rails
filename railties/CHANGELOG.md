@@ -1,3 +1,151 @@
+## Rails 5.2.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.5 (March 26, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.5 (February 10, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.4 (September 09, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.3 (May 18, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.2 (March 19, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.1 (December 18, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.4 (November 27, 2019) ##
+
+*   Use original `bundler` environment variables during the process of generating a new rails project.
+
+    *Marco Costa*
+
+*   Allow loading seeds without ActiveJob.
+
+    Fixes #35782
+
+    *Jeremy Weathers*
+
+*   Only force `:async` ActiveJob adapter to `:inline` during seeding.
+
+    *BatedUrGonnaDie*
+
+
+## Rails 5.2.3 (March 27, 2019) ##
+
+*   Seed database with inline ActiveJob job adapter.
+
+    *Gannon McGibbon*
+
+*   Fix boolean interaction in scaffold system tests.
+
+    *Gannon McGibbon*
+
+
+## Rails 5.2.2.1 (March 11, 2019) ##
+
+*   Generate random development secrets
+
+    A random development secret is now generated to tmp/development_secret.txt
+
+    This avoids an issue where development mode servers were vulnerable to
+    remote code execution.
+
+    Fixes CVE-2019-5420
+
+    *Eileen M. Uchitelle*, *Aaron Patterson*, *John Hawthorn*
+
+
+## Rails 5.2.2 (December 04, 2018) ##
+
+*   Disable content security policy for mailer previews.
+
+    *Dylan Reile*
+
+*   Log the remote IP address of clients behind a proxy.
+
+    *Atul Bhosale*
+
+
+## Rails 5.2.1.1 (November 27, 2018) ##
+
+*   No changes.
+
+
+## Rails 5.2.1 (August 07, 2018) ##
+
+*   Respect `NODE_ENV` when running `rails yarn:install`.
+
+    *Max Melentiev*
+
+*   Don't generate unused files in `app:update` task
+
+     Skip the assets' initializer when sprockets isn't loaded.
+
+     Skip `config/spring.rb` when spring isn't loaded.
+
+    *Tsukuru Tanimichi*
+
+*   Don't include `bootsnap` by default in apps generated under JRuby.
+
+    Fixes #32641.
+
+    *Guillermo Iguaran*
+
+*   Create the `.ruby-version` file compatible with MRI/JRuby by default.
+
+    Fixes #32639.
+
+    *Guillermo Iguaran*
+
+*   Make the master.key file read-only for the owner upon generation on
+    POSIX-compliant systems.
+
+    Previously:
+
+        $ ls -l config/master.key
+        -rw-r--r--   1 owner  group      32 Jan 1 00:00 master.key
+
+    Now:
+
+        $ ls -l config/master.key
+        -rw-------   1 owner  group      32 Jan 1 00:00 master.key
+
+    Fixes #32604.
+
+    *Jose Luis Duran*
+
+*   Allow use of `minitest-rails` gem with Rails test runner.
+
+    Fixes #31324.
+
+    *Yuji Yaginuma*
+
+
 ## Rails 5.2.0 (April 09, 2018) ##
 
 *   Fix minitest rails plugin.

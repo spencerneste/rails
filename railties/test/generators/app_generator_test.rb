@@ -297,6 +297,30 @@ class AppGeneratorTest < Rails::Generators::TestCase
     end
   end
 
+  def test_app_update_does_not_generate_assets_initializer_when_skip_sprockets_is_given
+    app_root = File.join(destination_root, "myapp")
+    run_generator [app_root, "--skip-sprockets"]
+
+    stub_rails_application(app_root) do
+      generator = Rails::Generators::AppGenerator.new ["rails"], { update: true, skip_sprockets: true }, { destination_root: app_root, shell: @shell }
+      generator.send(:app_const)
+      quietly { generator.send(:update_config_files) }
+
+      assert_no_file "#{app_root}/config/initializers/assets.rb"
+    end
+  end
+
+  def test_app_update_does_not_generate_spring_contents_when_skip_spring_is_given
+    app_root = File.join(destination_root, "myapp")
+    run_generator [app_root, "--skip-spring"]
+
+    FileUtils.cd(app_root) do
+      quietly { system("bin/rails app:update") }
+    end
+
+    assert_no_file "#{app_root}/config/spring.rb"
+  end
+
   def test_app_update_does_not_generate_action_cable_contents_when_skip_action_cable_is_given
     app_root = File.join(destination_root, "myapp")
     run_generator [app_root, "--skip-action-cable"]
@@ -599,6 +623,22 @@ class AppGeneratorTest < Rails::Generators::TestCase
     end
   end
 
+  def test_inclusion_of_listen_related_configuration_on_other_rubies
+    ruby_engine = Object.send(:remove_const, :RUBY_ENGINE)
+    Object.const_set(:RUBY_ENGINE, "MyRuby")
+    begin
+      run_generator
+      if RbConfig::CONFIG["host_os"] =~ /darwin|linux/
+        assert_listen_related_configuration
+      else
+        assert_no_listen_related_configuration
+      end
+    ensure
+      Object.send(:remove_const, :RUBY_ENGINE)
+      Object.const_set(:RUBY_ENGINE, ruby_engine)
+    end
+  end
+
   def test_non_inclusion_of_listen_related_configuration_if_skip_listen
     run_generator [destination_root, "--skip-listen"]
     assert_no_listen_related_configuration
@@ -693,6 +733,24 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
   def test_generation_runs_bundle_install
     assert_generates_with_bundler
+  end
+
+  def test_generation_use_original_bundle_environment
+    generator([destination_root], skip_webpack_install: true)
+
+    mock_original_env = -> do
+      { "BUNDLE_RUBYONRAILS__ORG" => "user:pass" }
+    end
+
+    ensure_environment_is_set = -> *_args do
+      assert_equal "user:pass", ENV["BUNDLE_RUBYONRAILS__ORG"]
+    end
+
+    Bundler.stub :original_env, mock_original_env do
+      generator.stub :exec_bundle_command, ensure_environment_is_set do
+        quietly { generator.invoke_all }
+      end
+    end
   end
 
   def test_dev_option
@@ -814,9 +872,18 @@ class AppGeneratorTest < Rails::Generators::TestCase
   def test_bootsnap
     run_generator
 
-    assert_gem "bootsnap"
-    assert_file "config/boot.rb" do |content|
-      assert_match(/require 'bootsnap\/setup'/, content)
+    unless defined?(JRUBY_VERSION)
+      assert_gem "bootsnap"
+      assert_file "config/boot.rb" do |content|
+        assert_match(/require 'bootsnap\/setup'/, content)
+      end
+    else
+       assert_file "Gemfile" do |content|
+        assert_no_match(/bootsnap/, content)
+      end
+      assert_file "config/boot.rb" do |content|
+        assert_no_match(/require 'bootsnap\/setup'/, content)
+      end
     end
   end
 
@@ -849,7 +916,15 @@ class AppGeneratorTest < Rails::Generators::TestCase
       assert_match(/ruby '#{RUBY_VERSION}'/, content)
     end
     assert_file ".ruby-version" do |content|
-      assert_match(/#{RUBY_VERSION}/, content)
+      if ENV["RBENV_VERSION"]
+        assert_match(/#{ENV["RBENV_VERSION"]}/, content)
+      elsif ENV["rvm_ruby_string"]
+        assert_match(/#{ENV["rvm_ruby_string"]}/, content)
+      elsif defined?(JRUBY_VERSION)
+        assert_match(/jruby-#{JRUBY_VERSION}/, content)
+      else
+        assert_match(/#{RUBY_ENGINE}-#{RUBY_VERSION}/, content)
+      end
     end
   end
 
@@ -875,6 +950,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
       test/helpers
       test/integration
       tmp
+      tmp/pids
     )
     folders_with_keep.each do |folder|
       assert_file("#{folder}/.keep")
@@ -937,6 +1013,15 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
     assert_file("test/system/.keep")
     assert_directory("test/system")
+  end
+
+  unless Gem.win_platform?
+    def test_master_key_is_only_readable_by_the_owner
+      run_generator
+
+      stat = File.stat("config/master.key")
+      assert_equal "100600", sprintf("%o", stat.mode)
+    end
   end
 
   private

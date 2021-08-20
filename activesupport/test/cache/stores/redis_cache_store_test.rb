@@ -14,9 +14,10 @@ Redis::Connection.drivers.append(driver)
 # Emulates a latency on Redis's back-end for the key latency to facilitate
 # connection pool testing.
 class SlowRedis < Redis
-  def get(key, options = {})
+  def get(key)
     if key =~ /latency/
       sleep 3
+      super
     else
       super
     end
@@ -149,7 +150,7 @@ module ActiveSupport::Cache::RedisCacheStoreTests
     private
 
       def store
-        :redis_cache_store
+        [:redis_cache_store]
       end
 
       def emulating_latency
@@ -166,7 +167,7 @@ module ActiveSupport::Cache::RedisCacheStoreTests
   class RedisDistributedConnectionPoolBehaviourTest < ConnectionPoolBehaviourTest
     private
       def store_options
-        { url: %w[ redis://localhost:6379/0 redis://localhost:6379/0 ] }
+        { url: [ENV["REDIS_URL"] || "redis://localhost:6379/0"] * 2 }
       end
   end
 
@@ -219,6 +220,24 @@ module ActiveSupport::Cache::RedisCacheStoreTests
       assert_raise ArgumentError do
         @cache.delete_matched(/OO/i)
       end
+    end
+  end
+
+  class ClearTest < StoreTest
+    test "clear all cache key" do
+      @cache.write("foo", "bar")
+      @cache.write("fu", "baz")
+      @cache.clear
+      assert !@cache.exist?("foo")
+      assert !@cache.exist?("fu")
+    end
+
+    test "only clear namespace cache key" do
+      @cache.write("foo", "bar")
+      @cache.redis.set("fu", "baz")
+      @cache.clear
+      assert !@cache.exist?("foo")
+      assert @cache.redis.exists("fu")
     end
   end
 end

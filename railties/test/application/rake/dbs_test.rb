@@ -83,6 +83,8 @@ module ApplicationTests
 
       def with_bad_permissions
         Dir.chdir(app_path) do
+          skip "Can't avoid permissions as root" if Process.uid.zero?
+
           set_database_url
           FileUtils.chmod("-w", "db")
           yield
@@ -93,7 +95,7 @@ module ApplicationTests
       test "db:create failure because bad permissions" do
         with_bad_permissions do
           output = rails("db:create", allow_failure: true)
-          assert_match(/Couldn't create database/, output)
+          assert_match("Couldn't create '#{database_url_db_name}' database. Please check your configuration.", output)
           assert_equal 1, $?.exitstatus
         end
       end

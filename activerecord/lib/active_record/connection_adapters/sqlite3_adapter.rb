@@ -9,7 +9,7 @@ require "active_record/connection_adapters/sqlite3/schema_definitions"
 require "active_record/connection_adapters/sqlite3/schema_dumper"
 require "active_record/connection_adapters/sqlite3/schema_statements"
 
-gem "sqlite3", "~> 1.3.6"
+gem "sqlite3", "~> 1.3", ">= 1.3.6"
 require "sqlite3"
 
 module ActiveRecord
@@ -453,9 +453,6 @@ module ActiveRecord
         def copy_table_indexes(from, to, rename = {})
           indexes(from).each do |index|
             name = index.name
-            # indexes sqlite creates for internal use start with `sqlite_` and
-            # don't need to be copied
-            next if name.starts_with?("sqlite_")
             if to == "a#{from}"
               name = "t#{name}"
             elsif from == "a#{to}"
@@ -528,9 +525,9 @@ module ActiveRecord
           result = exec_query(sql, "SCHEMA").first
 
           if result
-            # Splitting with left parentheses and picking up last will return all
+            # Splitting with left parentheses and discarding the first part will return all
             # columns separated with comma(,).
-            columns_string = result["sql"].split("(").last
+            columns_string = result["sql"].split("(", 2).last
 
             columns_string.split(",").each do |column_string|
               # This regex will match the column name and collation type and will save

@@ -1,3 +1,223 @@
+## Rails 5.2.6 (May 05, 2021) ##
+
+*   Accept base64_urlsafe CSRF tokens to make forward compatible.
+
+    Base64 strict-encoded CSRF tokens are not inherently websafe, which makes
+    them difficult to deal with. For example, the common practice of sending
+    the CSRF token to a browser in a client-readable cookie does not work properly
+    out of the box: the value has to be url-encoded and decoded to survive transport.
+
+    In this version, we generate Base64 urlsafe-encoded CSRF tokens, which are inherently
+    safe to transport. Validation accepts both urlsafe tokens, and strict-encoded
+    tokens for backwards compatibility.
+
+    How the tokes are encoded is controllr by the `action_controller.urlsafe_csrf_tokens`
+    config.
+
+    In Rails 5.2.5, the CSRF token format was accidentally changed to urlsafe-encoded.
+
+    **Atention**: If you already upgraded your application to 5.2.5, set the config
+    `urlsafe_csrf_tokens` to `true`, otherwise your form submission will start to fail
+    during the deploy of this new version.
+
+    ```ruby
+    Rails.application.config.action_controller.urlsafe_csrf_tokens = true
+    ```
+
+    If you are upgrading from 5.2.4.x, you don't need to change this configuration.
+
+    *Scott Blum*, *Étienne Barrié*
+
+
+## Rails 5.2.5 (March 26, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.6 (May 05, 2021) ##
+
+*   Prevent regex DoS in HTTP token authentication
+    CVE-2021-22904
+
+*   Prevent string polymorphic route arguments.
+
+    `url_for` supports building polymorphic URLs via an array
+    of arguments (usually symbols and records). If a developer passes a
+    user input array, strings can result in unwanted route helper calls.
+
+    CVE-2021-22885
+
+    *Gannon McGibbon*
+
+## Rails 5.2.4.5 (February 10, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.4 (September 09, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.3 (May 18, 2020) ##
+
+*   [CVE-2020-8166] HMAC raw CSRF token before masking it, so it cannot be used to reconstruct a per-form token
+
+*   [CVE-2020-8164] Return self when calling #each, #each_pair, and #each_value instead of the raw @parameters hash
+
+
+## Rails 5.2.4.2 (March 19, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.1 (December 18, 2019) ##
+
+*   Fix possible information leak / session hijacking vulnerability.
+
+    The `ActionDispatch::Session::MemcacheStore` is still vulnerable given it requires the
+    gem dalli to be updated as well.
+
+    _Breaking changes:_
+    *   `session.id` now returns an instance of `Rack::Session::SessionId` and not a String (use `session.id.public_id` to restore the old behaviour, see #38063)
+    *   Accessing the session id using `session[:session_id]`/`session['session_id']` no longer works with
+        ruby 2.2 (see https://github.com/rails/rails/commit/2a52a38cb51b65d71cf91fc960777213cf96f962#commitcomment-37929811)
+
+    CVE-2019-16782.
+
+
+## Rails 5.2.4 (November 27, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.3 (March 27, 2019) ##
+
+*   Allow using `public` and `no-cache` together in the the Cache Control header.
+
+    Before this change, even if `public` was specified in the Cache Control header,
+    it was excluded when `no-cache` was included. This change preserves the
+    `public` value as is.
+
+    Fixes #34780.
+
+    *Yuji Yaginuma*
+
+*   Allow `nil` params for `ActionController::TestCase`.
+
+    *Ryo Nakamura*
+
+
+## Rails 5.2.2.1 (March 11, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.2 (December 04, 2018) ##
+
+*   Reset Capybara sessions if failed system test screenshot raising an exception.
+
+    Reset Capybara sessions if `take_failed_screenshot` raise exception
+    in system test `after_teardown`.
+
+    *Maxim Perepelitsa*
+
+*   Use request object for context if there's no controller
+
+    There is no controller instance when using a redirect route or a
+    mounted rack application so pass the request object as the context
+    when resolving dynamic CSP sources in this scenario.
+
+    Fixes #34200.
+
+    *Andrew White*
+
+*   Apply mapping to symbols returned from dynamic CSP sources
+
+    Previously if a dynamic source returned a symbol such as :self it
+    would be converted to a string implicity, e.g:
+
+        policy.default_src -> { :self }
+
+    would generate the header:
+
+        Content-Security-Policy: default-src self
+
+    and now it generates:
+
+        Content-Security-Policy: default-src 'self'
+
+    *Andrew White*
+
+*   Fix `rails routes -c` for controller name consists of multiple word.
+
+    *Yoshiyuki Kinjo*
+
+*   Call the `#redirect_to` block in controller context.
+
+    *Steven Peckins*
+
+
+## Rails 5.2.1.1 (November 27, 2018) ##
+
+*   No changes.
+
+
+## Rails 5.2.1 (August 07, 2018) ##
+
+*   Prevent `?null=` being passed on JSON encoded test requests.
+
+    `RequestEncoder#encode_params` won't attempt to parse params if
+    there are none.
+
+    So call like this will no longer append a `?null=` query param.
+
+        get foos_url, as: :json
+
+    *Alireza Bashiri*
+
+*   Ensure `ActionController::Parameters#transform_values` and
+    `ActionController::Parameters#transform_values!` converts hashes into
+    parameters.
+
+    *Kevin Sjöberg*
+
+*   Fix strong parameters `permit!` with nested arrays.
+
+    Given:
+    ```
+    params = ActionController::Parameters.new(nested_arrays: [[{ x: 2, y: 3 }, { x: 21, y: 42 }]])
+    params.permit!
+    ```
+
+    `params[:nested_arrays][0][0].permitted?` will now return `true` instead of `false`.
+
+    *Steve Hull*
+
+*   Reset `RAW_POST_DATA` and `CONTENT_LENGTH` request environment between test requests in
+    `ActionController::TestCase` subclasses.
+
+    *Eugene Kenny*
+
+*   Output only one Content-Security-Policy nonce header value per request.
+
+    Fixes #32597.
+
+    *Andrey Novikov*, *Andrew White*
+
+*   Only disable GPUs for headless Chrome on Windows.
+
+    It is not necessary anymore for Linux and macOS machines.
+
+    https://bugs.chromium.org/p/chromium/issues/detail?id=737678#c1
+
+    *Stefan Wrobel*
+
+*   Fix system tests transactions not closed between examples.
+
+    *Sergey Tarasov*
+
+
 ## Rails 5.2.0 (April 09, 2018) ##
 
 *   Check exclude before flagging cookies as secure.
@@ -58,6 +278,34 @@
     *Andrew White*
 
 *   Matches behavior of `Hash#each` in `ActionController::Parameters#each`.
+
+    Rails 5.0 introduced a bug when looping through controller params using `each`. Only the keys of params hash were passed to the block, e.g.
+
+        # Parameters: {"param"=>"1", "param_two"=>"2"}
+        def index
+          params.each do |name|
+            puts name
+          end
+        end
+
+        # Prints
+        # param
+        # param_two
+
+    In Rails 5.2 the bug has been fixed and name will be an array (which was the behavior for all versions prior to 5.0), instead of a string.
+
+    To fix the code above simply change as per example below:
+
+        # Parameters: {"param"=>"1", "param_two"=>"2"}
+        def index
+          params.each do |name, value|
+            puts name
+          end
+        end
+
+        # Prints
+        # param
+        # param_two
 
     *Dominic Cleal*
 

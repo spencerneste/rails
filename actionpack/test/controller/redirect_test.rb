@@ -5,6 +5,12 @@ require "abstract_unit"
 class Workshop
   extend ActiveModel::Naming
   include ActiveModel::Conversion
+
+  OUT_OF_SCOPE_BLOCK = proc do
+    raise "Not executed in controller's context" unless RedirectController === self
+    request.original_url
+  end
+
   attr_accessor :id
 
   def initialize(id)
@@ -102,6 +108,14 @@ class RedirectController < ActionController::Base
     redirect_to nil
   end
 
+  def redirect_to_polymorphic
+    redirect_to [:internal, Workshop.new(5)]
+  end
+
+  def redirect_to_polymorphic_string_args
+    redirect_to ["internal", Workshop.new(5)]
+  end
+
   def redirect_to_params
     redirect_to ActionController::Parameters.new(status: 200, protocol: "javascript", f: "%0Aeval(name)")
   end
@@ -117,6 +131,10 @@ class RedirectController < ActionController::Base
 
   def redirect_to_with_block_and_options
     redirect_to proc { { action: "hello_world" } }
+  end
+
+  def redirect_to_out_of_scope_block
+    redirect_to Workshop::OUT_OF_SCOPE_BLOCK
   end
 
   def redirect_with_header_break
@@ -300,6 +318,43 @@ class RedirectTest < ActionController::TestCase
     end
   end
 
+  def test_polymorphic_redirect
+    with_routing do |set|
+      set.draw do
+        namespace :internal do
+          resources :workshops
+        end
+
+        ActiveSupport::Deprecation.silence do
+          get ":controller/:action"
+        end
+      end
+
+      get :redirect_to_polymorphic
+      assert_equal "http://test.host/internal/workshops/5", redirect_to_url
+      assert_redirected_to [:internal, Workshop.new(5)]
+    end
+  end
+
+  def test_polymorphic_redirect_with_string_args
+    with_routing do |set|
+      set.draw do
+        namespace :internal do
+          resources :workshops
+        end
+
+        ActiveSupport::Deprecation.silence do
+          get ":controller/:action"
+        end
+      end
+
+      error = assert_raises(ArgumentError) do
+        get :redirect_to_polymorphic_string_args
+      end
+      assert_equal("Please use symbols for polymorphic route arguments.", error.message)
+    end
+  end
+
   def test_redirect_to_nil
     error = assert_raise(ActionController::ActionControllerError) do
       get :redirect_to_nil
@@ -324,6 +379,12 @@ class RedirectTest < ActionController::TestCase
     get :redirect_to_with_block_and_assigns
     assert_response :redirect
     assert_redirected_to "http://www.rubyonrails.org/"
+  end
+
+  def test_redirect_to_out_of_scope_block
+    get :redirect_to_out_of_scope_block
+    assert_response :redirect
+    assert_redirected_to "http://test.host/redirect/redirect_to_out_of_scope_block"
   end
 
   def test_redirect_to_with_block_and_accepted_options

@@ -1,3 +1,306 @@
+## Rails 5.2.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.5 (March 26, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.5 (February 10, 2021) ##
+
+*   Fix possible DoS vector in PostgreSQL money type
+
+    Carefully crafted input can cause a DoS via the regular expressions used
+    for validating the money format in the PostgreSQL adapter.  This patch
+    fixes the regexp.
+
+    Thanks to @dee-see from Hackerone for this patch!
+
+    [CVE-2021-22880]
+
+    *Aaron Patterson*
+
+
+## Rails 5.2.4.4 (September 09, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.3 (May 18, 2020) ##
+
+*   No changes.
+
+## Rails 5.2.4.2 (March 19, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.1 (December 18, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.4 (November 27, 2019) ##
+
+*   Fix circular `autosave: true` causes invalid records to be saved.
+
+    Prior to the fix, when there was a circular series of `autosave: true`
+    associations, the callback for a `has_many` association was run while
+    another instance of the same callback on the same association hadn't
+    finished running. When control returned to the first instance of the
+    callback, the instance variable had changed, and subsequent associated
+    records weren't saved correctly. Specifically, the ID field for the
+    `belongs_to` corresponding to the `has_many` was `nil`.
+
+    Fixes #28080.
+
+    *Larry Reid*
+
+*   PostgreSQL: Fix GROUP BY with ORDER BY virtual count attribute.
+
+    Fixes #36022.
+
+    *Ryuta Kamizono*
+
+*   Fix sqlite3 collation parsing when using decimal columns.
+
+    *Martin R. Schuster*
+
+*   Make ActiveRecord `ConnectionPool.connections` method thread-safe.
+
+    Fixes #36465.
+
+    *Jeff Doering*
+
+*   Assign all attributes before calling `build` to ensure the child record is visible in
+    `before_add` and `after_add` callbacks for `has_many :through` associations.
+
+    Fixes #33249.
+
+    *Ryan H. Kerr*
+
+
+## Rails 5.2.3 (March 27, 2019) ##
+
+*   Fix different `count` calculation when using `size` with manual `select` with DISTINCT.
+
+    Fixes #35214.
+
+    *Juani Villarejo*
+
+*   Fix prepared statements caching to be enabled even when query caching is enabled.
+
+    *Ryuta Kamizono*
+
+*   Don't allow `where` with invalid value matches to nil values.
+
+    Fixes #33624.
+
+    *Ryuta Kamizono*
+
+*   Restore an ability that class level `update` without giving ids.
+
+    Fixes #34743.
+
+    *Ryuta Kamizono*
+
+*   Fix join table column quoting with SQLite.
+
+    *Gannon McGibbon*
+
+*   Ensure that `delete_all` on collection proxy returns affected count.
+
+    *Ryuta Kamizono*
+
+*   Reset scope after delete on collection association to clear stale offsets of removed records.
+
+    *Gannon McGibbon*
+
+
+## Rails 5.2.2.1 (March 11, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.2 (December 04, 2018) ##
+
+*   Do not ignore the scoping with query methods in the scope block.
+
+    *Ryuta Kamizono*
+
+*   Allow aliased attributes to be used in `#update_columns` and `#update`.
+
+    *Gannon McGibbon*
+
+*   Allow spaces in postgres table names.
+
+    Fixes issue where "user post" is misinterpreted as "\"user\".\"post\"" when quoting table names with the postgres
+    adapter.
+
+    *Gannon McGibbon*
+
+*   Cached columns_hash fields should be excluded from ResultSet#column_types
+
+    PR #34528 addresses the inconsistent behaviour when attribute is defined for an ignored column. The following test
+    was passing for SQLite and MySQL, but failed for PostgreSQL:
+
+    ```ruby
+    class DeveloperName < ActiveRecord::Type::String
+      def deserialize(value)
+        "Developer: #{value}"
+      end
+    end
+
+    class AttributedDeveloper < ActiveRecord::Base
+      self.table_name = "developers"
+
+      attribute :name, DeveloperName.new
+
+      self.ignored_columns += ["name"]
+    end
+
+    developer = AttributedDeveloper.create
+    developer.update_column :name, "name"
+
+    loaded_developer = AttributedDeveloper.where(id: developer.id).select("*").first
+    puts loaded_developer.name # should be "Developer: name" but it's just "name"
+    ```
+
+    *Dmitry Tsepelev*
+
+*   Values of enum are frozen, raising an error when attempting to modify them.
+
+    *Emmanuel Byrd*
+
+*   `update_columns` now correctly raises `ActiveModel::MissingAttributeError`
+    if the attribute does not exist.
+
+    *Sean Griffin*
+
+*   Do not use prepared statement in queries that have a large number of binds.
+
+    *Ryuta Kamizono*
+
+*   Fix query cache to load before first request.
+
+    *Eileen M. Uchitelle*
+
+*   Fix collection cache key with limit and custom select to avoid ambiguous timestamp column error.
+
+    Fixes #33056.
+
+    *Federico Martinez*
+
+*   Fix duplicated record creation when using nested attributes with `create_with`.
+
+    *Darwin Wu*
+
+*   Fix regression setting children record in parent `before_save` callback.
+
+    *Guo Xiang Tan*
+
+*   Prevent leaking of user's DB credentials on `rails db:create` failure.
+
+    *bogdanvlviv*
+
+*   Clear mutation tracker before continuing the around callbacks.
+
+    *Yuya Tanaka*
+
+*   Prevent deadlocks when waiting for connection from pool.
+
+    *Brent Wheeldon*
+
+*   Avoid extra scoping when using `Relation#update` that was causing this method to change the current scope.
+
+    *Ryuta Kamizono*
+
+*   Fix numericality validator not to be affected by custom getter.
+
+    *Ryuta Kamizono*
+
+*   Fix bulk change table ignores comment option on PostgreSQL.
+
+    *Yoshiyuki Kinjo*
+
+
+## Rails 5.2.1.1 (November 27, 2018) ##
+
+*   No changes.
+
+
+## Rails 5.2.1 (August 07, 2018) ##
+
+*   PostgreSQL: Support new relkind for partitioned tables.
+
+    Fixes #33008.
+
+    *Yannick Schutz*
+
+*   Rollback parent transaction when children fails to update.
+
+    *Guillaume Malette*
+
+*   Fix default value for MySQL time types with specified precision.
+
+    *Nikolay Kondratyev*
+
+*   Fix `touch` option to behave consistently with `Persistence#touch` method.
+
+    *Ryuta Kamizono*
+
+*   Fix `save` in `after_create_commit` won't invoke extra `after_create_commit`.
+
+    Fixes #32831.
+
+    *Ryuta Kamizono*
+
+*   Fix logic on disabling commit callbacks so they are not called unexpectedly when errors occur.
+
+    *Brian Durand*
+
+*   Fix parent record should not get saved with duplicate children records.
+
+    Fixes #32940.
+
+    *Santosh Wadghule*
+
+*   Fix that association's after_touch is not called with counter cache.
+
+    Fixes #31559.
+
+    *Ryuta Kamizono*
+
+*   `becomes` should clear the mutation tracker which is created in `after_initialize`.
+
+    Fixes #32867.
+
+    *Ryuta Kamizono*
+
+*   Allow a belonging to parent object to be created from a new record.
+
+    *Jolyon Pawlyn*
+
+*   Fix that building record with assigning multiple has_one associations
+    wrongly persists through record.
+
+    Fixes #32511.
+
+    *Sam DeCesare*
+
+*   Fix relation merging when one of the relations is going to skip the
+    query cache.
+
+    *James Williams*
+
+
 ## Rails 5.2.0 (April 09, 2018) ##
 
 *   MySQL: Support mysql2 0.5.x.

@@ -10,17 +10,17 @@ module ActiveStorage
   class Service::AzureStorageService < Service
     attr_reader :client, :blobs, :container, :signer
 
-    def initialize(storage_account_name:, storage_access_key:, container:)
-      @client = Azure::Storage::Client.create(storage_account_name: storage_account_name, storage_access_key: storage_access_key)
+    def initialize(storage_account_name:, storage_access_key:, container:, **options)
+      @client = Azure::Storage::Client.create(storage_account_name: storage_account_name, storage_access_key: storage_access_key, **options)
       @signer = Azure::Storage::Core::Auth::SharedAccessSignature.new(storage_account_name, storage_access_key)
       @blobs = client.blob_client
       @container = container
     end
 
-    def upload(key, io, checksum: nil)
+    def upload(key, io, checksum: nil, **)
       instrument :upload, key: key, checksum: checksum do
         begin
-          blobs.create_block_blob(container, key, io, content_md5: checksum)
+          blobs.create_block_blob(container, key, IO.try_convert(io) || io, content_md5: checksum)
         rescue Azure::Core::Http::HTTPError
           raise ActiveStorage::IntegrityError
         end

@@ -139,6 +139,23 @@ class TransactionCallbacksTest < ActiveRecord::TestCase
     assert_equal [], reply.history
   end
 
+  def test_only_call_after_commit_on_destroy_after_transaction_commits_for_destroyed_new_record
+    new_record = TopicWithCallbacks.new(title: "New topic", written_on: Date.today)
+    add_transaction_execution_blocks new_record
+
+    new_record.destroy
+    assert_equal [:commit_on_destroy], new_record.history
+  end
+
+  def test_save_in_after_create_commit_wont_invoke_extra_after_create_commit
+    new_record = TopicWithCallbacks.new(title: "New topic", written_on: Date.today)
+    add_transaction_execution_blocks new_record
+    new_record.after_commit_block(:create) { |r| r.save! }
+
+    new_record.save!
+    assert_equal [:commit_on_create, :commit_on_update], new_record.history
+  end
+
   def test_only_call_after_commit_on_create_and_doesnt_leaky
     r = ReplyWithCallbacks.new(content: "foo")
     r.save_on_after_create = true
@@ -333,6 +350,24 @@ class TransactionCallbacksTest < ActiveRecord::TestCase
     end
   end
 
+  def test_after_commit_callback_should_not_rollback_state_that_already_been_succeeded
+    klass = Class.new(TopicWithCallbacks) do
+      self.inheritance_column = nil
+      validates :title, presence: true
+      def self.name; "TopicWithCallbacks"; end
+    end
+
+    first = klass.new(title: "foo")
+    first.after_commit_block { |r| r.update(title: nil) if r.persisted? }
+    first.save!
+
+    assert_predicate first, :persisted?
+    assert_not_nil first.id
+  ensure
+    first.destroy!
+  end
+  uses_transaction :test_after_commit_callback_should_not_rollback_state_that_already_been_succeeded
+
   def test_after_rollback_callback_when_raise_should_restore_state
     error_class = Class.new(StandardError)
 
@@ -365,6 +400,26 @@ class TransactionCallbacksTest < ActiveRecord::TestCase
     assert_raise(ArgumentError) { Topic.after_commit(on: :save) }
     e = assert_raise(ArgumentError) { Topic.after_commit(on: "create") }
     assert_match(/:on conditions for after_commit and after_rollback callbacks have to be one of \[:create, :destroy, :update\]/, e.message)
+  end
+
+  def test_after_commit_chain_not_called_on_errors
+    record_1 = TopicWithCallbacks.create!
+    record_2 = TopicWithCallbacks.create!
+    record_3 = TopicWithCallbacks.create!
+    callbacks = []
+    record_1.after_commit_block { raise }
+    record_2.after_commit_block { callbacks << record_2.id }
+    record_3.after_commit_block { callbacks << record_3.id }
+    begin
+      TopicWithCallbacks.transaction do
+        record_1.save!
+        record_2.save!
+        record_3.save!
+      end
+    rescue
+      # From record_1.after_commit
+    end
+    assert_equal [], callbacks
   end
 
   def test_saving_a_record_with_a_belongs_to_that_specifies_touching_the_parent_should_call_callbacks_on_the_parent_object

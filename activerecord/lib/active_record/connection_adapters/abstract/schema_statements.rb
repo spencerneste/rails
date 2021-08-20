@@ -100,7 +100,7 @@ module ActiveRecord
       def index_exists?(table_name, column_name, options = {})
         column_names = Array(column_name).map(&:to_s)
         checks = []
-        checks << lambda { |i| i.columns == column_names }
+        checks << lambda { |i| Array(i.columns) == column_names }
         checks << lambda { |i| i.unique } if options[:unique]
         checks << lambda { |i| i.name == options[:name].to_s } if options[:name]
 
@@ -305,7 +305,7 @@ module ActiveRecord
         yield td if block_given?
 
         if options[:force]
-          drop_table(table_name, **options, if_exists: true)
+          drop_table(table_name, options.merge(if_exists: true))
         end
 
         result = execute schema_creation.accept td
@@ -741,22 +741,13 @@ module ActiveRecord
       # ====== Creating an index with a specific operator class
       #
       #   add_index(:developers, :name, using: 'gist', opclass: :gist_trgm_ops)
-      #
-      # generates:
-      #
-      #   CREATE INDEX developers_on_name ON developers USING gist (name gist_trgm_ops) -- PostgreSQL
+      #   # CREATE INDEX developers_on_name ON developers USING gist (name gist_trgm_ops) -- PostgreSQL
       #
       #   add_index(:developers, [:name, :city], using: 'gist', opclass: { city: :gist_trgm_ops })
-      #
-      # generates:
-      #
-      #   CREATE INDEX developers_on_name_and_city ON developers USING gist (name, city gist_trgm_ops) -- PostgreSQL
+      #   # CREATE INDEX developers_on_name_and_city ON developers USING gist (name, city gist_trgm_ops) -- PostgreSQL
       #
       #   add_index(:developers, [:name, :city], using: 'gist', opclass: :gist_trgm_ops)
-      #
-      # generates:
-      #
-      #   CREATE INDEX developers_on_name_and_city ON developers USING gist (name gist_trgm_ops, city gist_trgm_ops) -- PostgreSQL
+      #   # CREATE INDEX developers_on_name_and_city ON developers USING gist (name gist_trgm_ops, city gist_trgm_ops) -- PostgreSQL
       #
       # Note: only supported by PostgreSQL
       #
@@ -908,7 +899,7 @@ module ActiveRecord
             foreign_key_options = { to_table: reference_name }
           end
           foreign_key_options[:column] ||= "#{ref_name}_id"
-          remove_foreign_key(table_name, **foreign_key_options)
+          remove_foreign_key(table_name, foreign_key_options)
         end
 
         remove_column(table_name, "#{ref_name}_id")

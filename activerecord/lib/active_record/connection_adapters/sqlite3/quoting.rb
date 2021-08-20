@@ -12,11 +12,16 @@ module ActiveRecord
           quote_column_name(attr)
         end
 
+        def quote_table_name(name)
+          @quoted_table_names[name] ||= super.gsub(".", "\".\"").freeze
+        end
+
         def quote_column_name(name)
           @quoted_column_names[name] ||= %Q("#{super.gsub('"', '""')}").freeze
         end
 
         def quoted_time(value)
+          value = value.change(year: 2000, month: 1, day: 1)
           quoted_date(value).sub(/\A\d\d\d\d-\d\d-\d\d /, "2000-01-01 ")
         end
 

@@ -1,3 +1,159 @@
+## Rails 5.2.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.5 (March 26, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.6 (May 05, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.5 (February 10, 2021) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.4 (September 09, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.3 (May 18, 2020) ##
+
+*   [CVE-2020-8165] Deprecate Marshal.load on raw cache read in RedisCacheStore
+
+*   [CVE-2020-8165] Avoid Marshal.load on raw cache value in MemCacheStore
+
+## Rails 5.2.4.2 (March 19, 2020) ##
+
+*   No changes.
+
+
+## Rails 5.2.4.1 (December 18, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.4 (November 27, 2019) ##
+
+*   Make ActiveSupport::Logger Fiber-safe. Fixes #36752.
+
+    Use `Fiber.current.__id__` in `ActiveSupport::Logger#local_level=` in order
+    to make log level local to Ruby Fibers in addition to Threads.
+
+    Example:
+
+        logger = ActiveSupport::Logger.new(STDOUT)
+        logger.level = 1
+        p "Main is debug? #{logger.debug?}"
+
+        Fiber.new {
+          logger.local_level = 0
+          p "Thread is debug? #{logger.debug?}"
+        }.resume
+
+        p "Main is debug? #{logger.debug?}"
+
+    Before:
+
+        Main is debug? false
+        Thread is debug? true
+        Main is debug? true
+
+    After:
+
+        Main is debug? false
+        Thread is debug? true
+        Main is debug? false
+
+    *Alexander Varnin*
+
+
+## Rails 5.2.3 (March 27, 2019) ##
+
+*   Add `ActiveSupport::HashWithIndifferentAccess#assoc`.
+
+    `assoc` can now be called with either a string or a symbol.
+
+    *Stefan Schüßler*
+
+*   Fix `String#safe_constantize` throwing a `LoadError` for incorrectly cased constant references.
+
+    *Keenan Brock*
+
+*   Allow Range#=== and Range#cover? on Range
+
+    `Range#cover?` can now accept a range argument like `Range#include?` and
+    `Range#===`. `Range#===` works correctly on Ruby 2.6. `Range#include?` is moved
+    into a new file, with these two methods.
+
+    *utilum*
+
+*   If the same block is `included` multiple times for a Concern, an exception is no longer raised.
+
+    *Mark J. Titorenko*, *Vlad Bokov*
+
+
+## Rails 5.2.2.1 (March 11, 2019) ##
+
+*   No changes.
+
+
+## Rails 5.2.2 (December 04, 2018) ##
+
+*   Fix bug where `#to_options` for `ActiveSupport::HashWithIndifferentAccess`
+    would not act as alias for `#symbolize_keys`.
+
+    *Nick Weiland*
+
+*   Improve the logic that detects non-autoloaded constants.
+
+    *Jan Habermann*, *Xavier Noria*
+
+*   Fix bug where `URI.unescape` would fail with mixed Unicode/escaped character input:
+
+        URI.unescape("\xe3\x83\x90")  # => "バ"
+        URI.unescape("%E3%83%90")  # => "バ"
+        URI.unescape("\xe3\x83\x90%E3%83%90")  # => Encoding::CompatibilityError
+
+    *Ashe Connor*, *Aaron Patterson*
+
+
+## Rails 5.2.1.1 (November 27, 2018) ##
+
+*   No changes.
+
+
+## Rails 5.2.1 (August 07, 2018) ##
+
+*   Redis cache store: `delete_matched` no longer blocks the Redis server.
+    (Switches from evaled Lua to a batched SCAN + DEL loop.)
+
+    *Gleb Mazovetskiy*
+
+*   Fix bug where `ActiveSupport::Timezone.all` would fail when tzinfo data for
+    any timezone defined in `ActiveSupport::TimeZone::MAPPING` is missing.
+
+    *Dominik Sander*
+
+*   Fix bug where `ActiveSupport::Cache` will massively inflate the storage
+    size when compression is enabled (which is true by default). This patch
+    does not attempt to repair existing data: please manually flush the cache
+    to clear out the problematic entries.
+
+    *Godfrey Chan*
+
+*   Fix `ActiveSupport::Cache#read_multi` bug with local cache enabled that was
+    returning instances of `ActiveSupport::Cache::Entry` instead of the raw values.
+
+    *Jason Lee*
+
+
 ## Rails 5.2.0 (April 09, 2018) ##
 
 *   Caching: MemCache and Redis `read_multi` and `fetch_multi` speedup.

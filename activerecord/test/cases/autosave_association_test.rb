@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "cases/helper"
+require "models/author"
 require "models/bird"
 require "models/post"
 require "models/comment"
@@ -11,11 +12,13 @@ require "models/developer"
 require "models/computer"
 require "models/invoice"
 require "models/line_item"
+require "models/mouse"
 require "models/order"
 require "models/parrot"
 require "models/pirate"
 require "models/ship"
 require "models/ship_part"
+require "models/squeak"
 require "models/tag"
 require "models/tagging"
 require "models/treasure"
@@ -27,9 +30,11 @@ require "models/member_detail"
 require "models/organization"
 require "models/guitar"
 require "models/tuning_peg"
+require "models/topic"
+require "models/reply"
 
 class TestAutosaveAssociationsInGeneral < ActiveRecord::TestCase
-  def test_autosave_validation
+  def test_autosave_does_not_pass_through_non_custom_validation_contexts
     person = Class.new(ActiveRecord::Base) {
       self.table_name = "people"
       validate :should_be_cool, on: :create
@@ -50,8 +55,11 @@ class TestAutosaveAssociationsInGeneral < ActiveRecord::TestCase
     }
 
     u = person.create!(first_name: "cool")
-    u.update_attributes!(first_name: "nah") # still valid because validation only applies on 'create'
-    assert_predicate reference.create!(person: u), :persisted?
+    u.first_name = "nah"
+
+    assert_predicate u, :valid?
+    r = reference.new(person: u)
+    assert_predicate r, :valid?
   end
 
   def test_should_not_add_the_same_callbacks_multiple_times_for_has_one
@@ -384,6 +392,20 @@ class TestDefaultAutosaveAssociationOnABelongsToAssociation < ActiveRecord::Test
 
     assert_predicate auditlog, :valid?
   end
+
+  def test_validation_does_not_validate_non_dirty_association_target
+    mouse = Mouse.create!(name: "Will")
+    Squeak.create!(mouse: mouse)
+
+    mouse.name = nil
+    mouse.save! validate: false
+
+    squeak = Squeak.last
+
+    assert_equal true, squeak.valid?
+    assert_equal true, squeak.mouse.present?
+    assert_equal true, squeak.valid?
+  end
 end
 
 class TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes < ActiveRecord::TestCase
@@ -517,6 +539,18 @@ class TestDefaultAutosaveAssociationOnAHasManyAssociation < ActiveRecord::TestCa
     assert_not_predicate new_firm, :persisted?
   end
 
+  def test_adding_unsavable_association
+    new_firm = Firm.new("name" => "A New Firm, Inc")
+    client = new_firm.clients.new("name" => "Apple")
+    client.throw_on_save = true
+
+    assert_predicate client, :valid?
+    assert_predicate new_firm, :valid?
+    assert_not new_firm.save
+    assert_not_predicate new_firm, :persisted?
+    assert_not_predicate client, :persisted?
+  end
+
   def test_invalid_adding_with_validate_false
     firm = Firm.first
     client = Client.new
@@ -543,6 +577,34 @@ class TestDefaultAutosaveAssociationOnAHasManyAssociation < ActiveRecord::TestCa
     assert firm.save
     assert_predicate client, :persisted?
     assert_equal no_of_clients + 1, Client.count
+  end
+
+  def test_parent_should_save_children_record_with_foreign_key_validation_set_in_before_save_callback
+    company = NewlyContractedCompany.new(name: "test")
+
+    assert company.save
+    assert_not_empty company.reload.new_contracts
+  end
+
+  def test_parent_should_not_get_saved_with_duplicate_children_records
+    assert_no_difference "Reply.count" do
+      assert_no_difference "SillyUniqueReply.count" do
+        reply = Reply.new
+        reply.silly_unique_replies.build([
+          { content: "Best content" },
+          { content: "Best content" }
+        ])
+
+        assert_not reply.save
+        assert_equal ["is invalid"], reply.errors[:silly_unique_replies]
+        assert_empty reply.silly_unique_replies.first.errors
+
+        assert_equal(
+          ["has already been taken"],
+          reply.silly_unique_replies.last.errors[:content]
+        )
+      end
+    end
   end
 
   def test_invalid_build
@@ -1251,21 +1313,45 @@ end
 class TestAutosaveAssociationOnAHasOneThroughAssociation < ActiveRecord::TestCase
   self.use_transactional_tests = false unless supports_savepoints?
 
-  def setup
-    super
+  def create_member_with_organization
     organization = Organization.create
-    @member = Member.create
-    MemberDetail.create(organization: organization, member: @member)
+    member = Member.create
+    MemberDetail.create(organization: organization, member: member)
+
+    member
   end
 
   def test_should_not_has_one_through_model
-    class << @member.organization
+    member = create_member_with_organization
+
+    class << member.organization
       def save(*args)
         super
         raise "Oh noes!"
       end
     end
-    assert_nothing_raised { @member.save }
+    assert_nothing_raised { member.save }
+  end
+
+  def create_author_with_post_with_comment
+    Author.create! name: "David" # make comment_id not match author_id
+    author = Author.create! name: "Sergiy"
+    post = Post.create! author: author, title: "foo", body: "bar"
+    Comment.create! post: post, body: "cool comment"
+
+    author
+  end
+
+  def test_should_not_reversed_has_one_through_model
+    author = create_author_with_post_with_comment
+
+    class << author.comment_on_first_post
+      def save(*args)
+        super
+        raise "Oh noes!"
+      end
+    end
+    assert_nothing_raised { author.save }
   end
 end
 
@@ -1600,6 +1686,14 @@ class TestAutosaveAssociationValidationsOnAHasManyAssociation < ActiveRecord::Te
 
     assert_not_predicate @pirate, :valid?
   end
+
+  def test_validations_still_fire_on_unchanged_association_with_custom_validation_context
+    pirate = FamousPirate.create!(catchphrase: "Avast Ye!")
+    pirate.famous_ships.create!
+
+    assert pirate.valid?
+    assert_not pirate.valid?(:conference)
+  end
 end
 
 class TestAutosaveAssociationValidationsOnAHasOneAssociation < ActiveRecord::TestCase
@@ -1643,6 +1737,13 @@ class TestAutosaveAssociationValidationsOnABelongsToAssociation < ActiveRecord::
     assert_predicate @pirate, :valid?
     @pirate.non_validated_parrot = Parrot.new(name: "")
     assert_predicate @pirate, :valid?
+  end
+
+  def test_validations_still_fire_on_unchanged_association_with_custom_validation_context
+    firm_with_low_credit = Firm.create!(name: "Something", account: Account.new(credit_limit: 50))
+
+    assert firm_with_low_credit.valid?
+    assert_not firm_with_low_credit.valid?(:bank_loan)
   end
 end
 

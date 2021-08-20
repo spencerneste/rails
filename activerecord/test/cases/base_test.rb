@@ -14,7 +14,6 @@ require "models/computer"
 require "models/project"
 require "models/default"
 require "models/auto_id"
-require "models/boolean"
 require "models/column_name"
 require "models/subscriber"
 require "models/comment"
@@ -690,6 +689,9 @@ class BasicsTest < ActiveRecord::TestCase
       topic = Topic.find(1)
       topic.attributes = attributes
       assert_equal Time.local(2000, 1, 1, 5, 42, 0), topic.bonus_time
+
+      topic.save!
+      assert_equal topic, Topic.find_by(attributes)
     end
   end
 
@@ -714,48 +716,6 @@ class BasicsTest < ActiveRecord::TestCase
 
     assert_instance_of Hash, category.attributes
     assert_equal expected_attributes, category.attributes
-  end
-
-  def test_boolean
-    b_nil = Boolean.create("value" => nil)
-    nil_id = b_nil.id
-    b_false = Boolean.create("value" => false)
-    false_id = b_false.id
-    b_true = Boolean.create("value" => true)
-    true_id = b_true.id
-
-    b_nil = Boolean.find(nil_id)
-    assert_nil b_nil.value
-    b_false = Boolean.find(false_id)
-    assert_not_predicate b_false, :value?
-    b_true = Boolean.find(true_id)
-    assert_predicate b_true, :value?
-  end
-
-  def test_boolean_without_questionmark
-    b_true = Boolean.create("value" => true)
-    true_id = b_true.id
-
-    subclass   = Class.new(Boolean).find true_id
-    superclass = Boolean.find true_id
-
-    assert_equal superclass.read_attribute(:has_fun), subclass.read_attribute(:has_fun)
-  end
-
-  def test_boolean_cast_from_string
-    b_blank = Boolean.create("value" => "")
-    blank_id = b_blank.id
-    b_false = Boolean.create("value" => "0")
-    false_id = b_false.id
-    b_true = Boolean.create("value" => "1")
-    true_id = b_true.id
-
-    b_blank = Boolean.find(blank_id)
-    assert_nil b_blank.value
-    b_false = Boolean.find(false_id)
-    assert_not_predicate b_false, :value?
-    b_true = Boolean.find(true_id)
-    assert_predicate b_true, :value?
   end
 
   def test_new_record_returns_boolean
@@ -1265,14 +1225,15 @@ class BasicsTest < ActiveRecord::TestCase
   end
 
   def test_attribute_names
-    assert_equal ["id", "type", "firm_id", "firm_name", "name", "client_of", "rating", "account_id", "description"],
-                 Company.attribute_names
+    expected = ["id", "type", "firm_id", "firm_name", "name", "client_of", "rating", "account_id", "description", "metadata"]
+    assert_equal expected, Company.attribute_names
   end
 
   def test_has_attribute
     assert Company.has_attribute?("id")
     assert Company.has_attribute?("type")
     assert Company.has_attribute?("name")
+    assert Company.has_attribute?("metadata")
     assert_not Company.has_attribute?("lastname")
     assert_not Company.has_attribute?("age")
   end
@@ -1484,6 +1445,14 @@ class BasicsTest < ActiveRecord::TestCase
 
     assert_not_respond_to developer, :first_name
     assert_not_respond_to developer, :first_name=
+  end
+
+  test "when ignored attribute is loaded, cast type should be preferred over DB type" do
+    developer = AttributedDeveloper.create
+    developer.update_column :name, "name"
+
+    loaded_developer = AttributedDeveloper.where(id: developer.id).select("*").first
+    assert_equal "Developer: name", loaded_developer.name
   end
 
   test "ignored columns not included in SELECT" do

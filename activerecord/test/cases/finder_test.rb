@@ -246,6 +246,25 @@ class FinderTest < ActiveRecord::TestCase
     assert_equal true, Topic.first.replies.exists?
   end
 
+  def test_exists_with_empty_hash_arg
+    assert_equal true, Topic.exists?({})
+  end
+
+  def test_exists_with_distinct_and_offset_and_joins
+    assert Post.left_joins(:comments).distinct.offset(10).exists?
+    assert_not Post.left_joins(:comments).distinct.offset(11).exists?
+  end
+
+  def test_exists_with_distinct_and_offset_and_select
+    assert Post.select(:body).distinct.offset(3).exists?
+    assert_not Post.select(:body).distinct.offset(4).exists?
+  end
+
+  def test_exists_with_distinct_and_offset_and_eagerload_and_order
+    assert Post.eager_load(:comments).distinct.offset(10).merge(Comment.order(post_id: :asc)).exists?
+    assert_not Post.eager_load(:comments).distinct.offset(11).merge(Comment.order(post_id: :asc)).exists?
+  end
+
   # Ensure +exists?+ runs without an error by excluding distinct value.
   # See https://github.com/rails/rails/pull/26981.
   def test_exists_with_order_and_distinct
@@ -336,7 +355,7 @@ class FinderTest < ActiveRecord::TestCase
     #   limit of 3 and offset of 9, then you should find that there
     #   will be only 2 results, regardless of the limit.
     devs = Developer.all
-    last_devs = Developer.limit(3).offset(9).find devs.map(&:id)
+    last_devs = Developer.limit(3).offset(9).find(devs.map(&:id).sort)
     assert_equal 2, last_devs.size
     assert_equal "fixture_10", last_devs[0].name
     assert_equal "Jamis", last_devs[1].name
@@ -365,7 +384,10 @@ class FinderTest < ActiveRecord::TestCase
   end
 
   def test_find_an_empty_array
-    assert_equal [], Topic.find([])
+    empty_array = []
+    result = Topic.find(empty_array)
+    assert_equal [], result
+    assert_not_same empty_array, result
   end
 
   def test_find_doesnt_have_implicit_ordering
@@ -414,7 +436,7 @@ class FinderTest < ActiveRecord::TestCase
   end
 
   def test_take
-    assert_equal topics(:first), Topic.take
+    assert_equal topics(:first), Topic.where("title = 'The First Topic'").take
   end
 
   def test_take_failing
@@ -885,6 +907,7 @@ class FinderTest < ActiveRecord::TestCase
     assert_kind_of Money, zaphod_balance
     found_customers = Customer.where(balance: [david_balance, zaphod_balance])
     assert_equal [customers(:david), customers(:zaphod)], found_customers.sort_by(&:id)
+    assert_equal Customer.where(balance: [david_balance.amount, zaphod_balance.amount]).to_sql, found_customers.to_sql
   end
 
   def test_hash_condition_find_with_aggregate_attribute_having_same_name_as_field_and_key_value_being_aggregate
@@ -920,6 +943,24 @@ class FinderTest < ActiveRecord::TestCase
     assert_kind_of Address, address
     found_customer = Customer.where(address: address, name: customers(:david).name).first
     assert_equal customers(:david), found_customer
+  end
+
+  def test_hash_condition_find_nil_with_aggregate_having_one_mapping
+    assert_nil customers(:zaphod).gps_location
+    found_customer = Customer.where(gps_location: nil, name: customers(:zaphod).name).first
+    assert_equal customers(:zaphod), found_customer
+  end
+
+  def test_hash_condition_find_nil_with_aggregate_having_multiple_mappings
+    customers(:david).update(address: nil)
+    assert_nil customers(:david).address_street
+    assert_nil customers(:david).address_city
+    found_customer = Customer.where(address: nil, name: customers(:david).name).first
+    assert_equal customers(:david), found_customer
+  end
+
+  def test_hash_condition_find_empty_array_with_aggregate_having_multiple_mappings
+    assert_nil Customer.where(address: []).first
   end
 
   def test_condition_utc_time_interpolation_with_default_timezone_local

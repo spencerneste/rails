@@ -52,9 +52,10 @@ createXHR = (options, done) ->
   # Sending FormData will automatically set Content-Type to multipart/form-data
   if typeof options.data is 'string'
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8')
-  xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest') unless options.crossDomain
-  # Add X-CSRF-Token
-  CSRFProtection(xhr)
+  unless options.crossDomain
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
+    # Add X-CSRF-Token
+    CSRFProtection(xhr)
   xhr.withCredentials = !!options.withCredentials
   xhr.onreadystatechange = ->
     done(xhr) if xhr.readyState is XMLHttpRequest.DONE
@@ -66,7 +67,7 @@ processResponse = (response, type) ->
       try response = JSON.parse(response)
     else if type.match(/\b(?:java|ecma)script\b/)
       script = document.createElement('script')
-      script.nonce = cspNonce()
+      script.setAttribute('nonce', cspNonce())
       script.text = response
       document.head.appendChild(script).parentNode.removeChild(script)
     else if type.match(/\b(xml|html|svg)\b/)

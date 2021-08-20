@@ -3,6 +3,7 @@
 module ActiveModel
   module Type
     class Time < Value # :nodoc:
+      include Helpers::Timezone
       include Helpers::TimeValue
       include Helpers::AcceptsMultiparameterTime.new(
         defaults: { 1 => 1970, 2 => 1, 3 => 1, 4 => 0, 5 => 0 }
@@ -12,12 +13,18 @@ module ActiveModel
         :time
       end
 
+      def serialize(value)
+        super(cast(value))
+      end
+
       def user_input_in_time_zone(value)
         return unless value.present?
 
         case value
         when ::String
           value = "2000-01-01 #{value}"
+          time_hash = ::Date._parse(value)
+          return if time_hash[:hour].nil?
         when ::Time
           value = value.change(year: 2000, day: 1, month: 1)
         end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+gem "aws-sdk-s3", "~> 1.48"
+
 require "aws-sdk-s3"
 require "active_support/core_ext/numeric/bytes"
 
@@ -16,7 +18,7 @@ module ActiveStorage
       @upload_options = upload
     end
 
-    def upload(key, io, checksum: nil)
+    def upload(key, io, checksum: nil, **)
       instrument :upload, key: key, checksum: checksum do
         begin
           object_for(key).put(upload_options.merge(body: io, content_md5: checksum))
@@ -33,7 +35,7 @@ module ActiveStorage
         end
       else
         instrument :download, key: key do
-          object_for(key).get.body.read.force_encoding(Encoding::BINARY)
+          object_for(key).get.body.string.force_encoding(Encoding::BINARY)
         end
       end
     end
@@ -79,7 +81,8 @@ module ActiveStorage
     def url_for_direct_upload(key, expires_in:, content_type:, content_length:, checksum:)
       instrument :url, key: key do |payload|
         generated_url = object_for(key).presigned_url :put, expires_in: expires_in.to_i,
-          content_type: content_type, content_length: content_length, content_md5: checksum
+          content_type: content_type, content_length: content_length, content_md5: checksum,
+          whitelist_headers: ['content-length']
 
         payload[:url] = generated_url
 

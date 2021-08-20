@@ -373,7 +373,7 @@ module ActiveRecord
       became = klass.allocate
       became.send(:initialize)
       became.instance_variable_set("@attributes", @attributes)
-      became.instance_variable_set("@mutations_from_database", @mutations_from_database) if defined?(@mutations_from_database)
+      became.instance_variable_set("@mutations_from_database", @mutations_from_database ||= nil)
       became.instance_variable_set("@changed_attributes", attributes_changed_by_setter)
       became.instance_variable_set("@new_record", new_record?)
       became.instance_variable_set("@destroyed", destroyed?)
@@ -473,14 +473,15 @@ module ActiveRecord
         verify_readonly_attribute(key.to_s)
       end
 
+      id_in_database = self.id_in_database
+      attributes.each do |k, v|
+        write_attribute_without_type_cast(k, v)
+      end
+
       affected_rows = self.class._update_record(
         attributes,
         self.class.primary_key => id_in_database
       )
-
-      attributes.each do |k, v|
-        write_attribute_without_type_cast(k, v)
-      end
 
       affected_rows == 1
     end

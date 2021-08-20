@@ -6,7 +6,9 @@ require "support/schema_dumping_helper"
 class PostgresqlMoneyTest < ActiveRecord::PostgreSQLTestCase
   include SchemaDumpingHelper
 
-  class PostgresqlMoney < ActiveRecord::Base; end
+  class PostgresqlMoney < ActiveRecord::Base
+    validates :depth, numericality: true
+  end
 
   setup do
     @connection = ActiveRecord::Base.connection
@@ -35,6 +37,7 @@ class PostgresqlMoneyTest < ActiveRecord::PostgreSQLTestCase
   def test_default
     assert_equal BigDecimal("150.55"), PostgresqlMoney.column_defaults["depth"]
     assert_equal BigDecimal("150.55"), PostgresqlMoney.new.depth
+    assert_equal "$150.55", PostgresqlMoney.new.depth_before_type_cast
   end
 
   def test_money_values
@@ -53,6 +56,14 @@ class PostgresqlMoneyTest < ActiveRecord::PostgreSQLTestCase
     assert_equal(12345678.12, type.cast("$12.345.678,12".dup))
     assert_equal(-1.15, type.cast("-$1.15".dup))
     assert_equal(-2.25, type.cast("($2.25)".dup))
+  end
+
+  def test_money_regex_backtracking
+    type = PostgresqlMoney.type_for_attribute("wealth")
+    Timeout.timeout(0.1) do
+      assert_equal(0.0, type.cast("$" + "," * 100000 + ".11!"))
+      assert_equal(0.0, type.cast("$" + "." * 100000 + ",11!"))
+    end
   end
 
   def test_schema_dumping

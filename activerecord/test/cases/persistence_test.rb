@@ -128,6 +128,20 @@ class PersistenceTest < ActiveRecord::TestCase
     assert_not_equal "2 updated", Topic.find(2).content
   end
 
+  def test_class_level_update_without_ids
+    topics = Topic.all
+    assert_equal 5, topics.length
+    topics.each do |topic|
+      assert_not_equal "updated", topic.content
+    end
+
+    updated = Topic.update(content: "updated")
+    assert_equal 5, updated.length
+    updated.each do |topic|
+      assert_equal "updated", topic.content
+    end
+  end
+
   def test_class_level_update_is_affected_by_scoping
     topic_data = { 1 => { "content" => "1 updated" }, 2 => { "content" => "2 updated" } }
 
@@ -206,12 +220,33 @@ class PersistenceTest < ActiveRecord::TestCase
     assert_equal initial_credit + 2, a1.reload.credit_limit
   end
 
-  def test_increment_updates_timestamps
+  def test_increment_with_touch_updates_timestamps
     topic = topics(:first)
-    topic.update_columns(updated_at: 5.minutes.ago)
-    previous_updated_at = topic.updated_at
-    topic.increment!(:replies_count, touch: true)
-    assert_operator previous_updated_at, :<, topic.reload.updated_at
+    assert_equal 1, topic.replies_count
+    previously_updated_at = topic.updated_at
+    travel(1.second) do
+      topic.increment!(:replies_count, touch: true)
+    end
+    assert_equal 2, topic.reload.replies_count
+    assert_operator previously_updated_at, :<, topic.updated_at
+  end
+
+  def test_increment_with_touch_an_attribute_updates_timestamps
+    topic = topics(:first)
+    assert_equal 1, topic.replies_count
+    previously_updated_at = topic.updated_at
+    previously_written_on = topic.written_on
+    travel(1.second) do
+      topic.increment!(:replies_count, touch: :written_on)
+    end
+    assert_equal 2, topic.reload.replies_count
+    assert_operator previously_updated_at, :<, topic.updated_at
+    assert_operator previously_written_on, :<, topic.written_on
+  end
+
+  def test_increment_with_no_arg
+    topic = topics(:first)
+    assert_raises(ArgumentError) { topic.increment! }
   end
 
   def test_destroy_all
@@ -290,6 +325,17 @@ class PersistenceTest < ActiveRecord::TestCase
     assert_equal "The First Topic", Topic.find(copy.id).title
   end
 
+  def test_becomes_wont_break_mutation_tracking
+    topic = topics(:first)
+    reply = topic.becomes(Reply)
+
+    assert_equal 1, topic.id_in_database
+    assert_empty topic.attributes_in_database
+
+    assert_equal 1, reply.id_in_database
+    assert_empty reply.attributes_in_database
+  end
+
   def test_becomes_includes_changed_attributes
     company = Company.new(name: "37signals")
     client = company.becomes(Client)
@@ -322,12 +368,28 @@ class PersistenceTest < ActiveRecord::TestCase
     assert_equal 41, accounts(:signals37, :reload).credit_limit
   end
 
-  def test_decrement_updates_timestamps
+  def test_decrement_with_touch_updates_timestamps
     topic = topics(:first)
-    topic.update_columns(updated_at: 5.minutes.ago)
-    previous_updated_at = topic.updated_at
-    topic.decrement!(:replies_count, touch: true)
-    assert_operator previous_updated_at, :<, topic.reload.updated_at
+    assert_equal 1, topic.replies_count
+    previously_updated_at = topic.updated_at
+    travel(1.second) do
+      topic.decrement!(:replies_count, touch: true)
+    end
+    assert_equal 0, topic.reload.replies_count
+    assert_operator previously_updated_at, :<, topic.updated_at
+  end
+
+  def test_decrement_with_touch_an_attribute_updates_timestamps
+    topic = topics(:first)
+    assert_equal 1, topic.replies_count
+    previously_updated_at = topic.updated_at
+    previously_written_on = topic.written_on
+    travel(1.second) do
+      topic.decrement!(:replies_count, touch: :written_on)
+    end
+    assert_equal 0, topic.reload.replies_count
+    assert_operator previously_updated_at, :<, topic.updated_at
+    assert_operator previously_written_on, :<, topic.written_on
   end
 
   def test_create

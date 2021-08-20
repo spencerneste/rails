@@ -232,9 +232,6 @@ module ActiveRecord
 
     def _select!(*fields) # :nodoc:
       fields.flatten!
-      fields.map! do |field|
-        klass.attribute_alias?(field) ? klass.attribute_alias(field).to_sym : field
-      end
       self.select_values += fields
       self
     end
@@ -893,8 +890,8 @@ module ActiveRecord
       self
     end
 
-    def skip_query_cache! # :nodoc:
-      self.skip_query_cache_value = true
+    def skip_query_cache!(value = true) # :nodoc:
+      self.skip_query_cache_value = value
       self
     end
 
@@ -903,11 +900,12 @@ module ActiveRecord
       @arel ||= build_arel(aliases)
     end
 
+    # Returns a relation value with a given name
+    def get_value(name) # :nodoc:
+      @values.fetch(name, DEFAULT_VALUES[name])
+    end
+
     protected
-      # Returns a relation value with a given name
-      def get_value(name) # :nodoc:
-        @values.fetch(name, DEFAULT_VALUES[name])
-      end
 
       # Sets the relation value with the given name
       def set_value(name, value) # :nodoc:
@@ -1011,19 +1009,19 @@ module ActiveRecord
       def build_join_query(manager, buckets, join_type, aliases)
         buckets.default = []
 
-        association_joins         = buckets[:association_join]
-        stashed_association_joins = buckets[:stashed_join]
-        join_nodes                = buckets[:join_node].uniq
-        string_joins              = buckets[:string_join].map(&:strip).uniq
+        association_joins = buckets[:association_join]
+        stashed_joins     = buckets[:stashed_join]
+        join_nodes        = buckets[:join_node].uniq
+        string_joins      = buckets[:string_join].map(&:strip).uniq
 
         join_list = join_nodes + convert_join_strings_to_ast(string_joins)
         alias_tracker = alias_tracker(join_list, aliases)
 
         join_dependency = ActiveRecord::Associations::JoinDependency.new(
-          klass, table, association_joins, alias_tracker
+          klass, table, association_joins
         )
 
-        joins = join_dependency.join_constraints(stashed_association_joins, join_type)
+        joins = join_dependency.join_constraints(stashed_joins, join_type, alias_tracker)
         joins.each { |join| manager.from(join) }
 
         manager.join_sources.concat(join_list)
@@ -1049,15 +1047,35 @@ module ActiveRecord
       end
 
       def arel_columns(columns)
-        columns.map do |field|
-          if (Symbol === field || String === field) && (klass.has_attribute?(field) || klass.attribute_alias?(field)) && !from_clause.value
-            arel_attribute(field)
-          elsif Symbol === field
-            connection.quote_table_name(field.to_s)
+        columns.flat_map do |field|
+          case field
+          when Symbol
+            arel_column(field.to_s) do |attr_name|
+              connection.quote_table_name(attr_name)
+            end
+          when String
+            arel_column(field, &:itself)
+          when Proc
+            field.call
           else
             field
           end
         end
+      end
+
+      def arel_column(field)
+        field = klass.attribute_alias(field) if klass.attribute_alias?(field)
+        from = from_clause.name || from_clause.value
+
+        if klass.columns_hash.key?(field) && (!from || table_name_matches?(from))
+          arel_attribute(field)
+        else
+          yield field
+        end
+      end
+
+      def table_name_matches?(from)
+        /(?:\A|(?<!FROM)\s)(?:\b#{table.name}\b|#{connection.quote_table_name(table.name)})(?!\.)/i.match?(from.to_s)
       end
 
       def reverse_sql_order(order_query)
@@ -1141,20 +1159,30 @@ module ActiveRecord
         order_args.map! do |arg|
           case arg
           when Symbol
-            arel_attribute(arg).asc
+            order_column(arg.to_s).asc
           when Hash
             arg.map { |field, dir|
               case field
               when Arel::Nodes::SqlLiteral
                 field.send(dir.downcase)
               else
-                arel_attribute(field).send(dir.downcase)
+                order_column(field.to_s).send(dir.downcase)
               end
             }
           else
             arg
           end
         end.flatten!
+      end
+
+      def order_column(field)
+        arel_column(field) do |attr_name|
+          if attr_name == "count" && !group_values.empty?
+            arel_attribute(attr_name)
+          else
+            Arel.sql(connection.quote_table_name(attr_name))
+          end
+        end
       end
 
       # Checks to make sure that the arguments are not blank. Note that if some

@@ -48,7 +48,12 @@ module ActiveRecord
     end
 
     def build(attribute, value)
-      handler_for(value).call(attribute, value)
+      if table.type(attribute.name).force_equality?(value)
+        bind = build_bind_attribute(attribute.name, value)
+        attribute.eq(bind)
+      else
+        handler_for(value).call(attribute, value)
+      end
     end
 
     def build_bind_attribute(column_name, value)
@@ -88,20 +93,21 @@ module ActiveRecord
             queries.reduce(&:or)
           elsif table.aggregated_with?(key)
             mapping = table.reflect_on_aggregation(key).mapping
-            queries = Array.wrap(value).map do |object|
-              mapping.map do |field_attr, aggregate_attr|
-                if mapping.size == 1 && !object.respond_to?(aggregate_attr)
-                  build(table.arel_attribute(field_attr), object)
-                else
-                  build(table.arel_attribute(field_attr), object.send(aggregate_attr))
-                end
-              end.reduce(&:and)
+            values = value.nil? ? [nil] : Array.wrap(value)
+            if mapping.length == 1 || values.empty?
+              column_name, aggr_attr = mapping.first
+              values = values.map do |object|
+                object.respond_to?(aggr_attr) ? object.public_send(aggr_attr) : object
+              end
+              build(table.arel_attribute(column_name), values)
+            else
+              queries = values.map do |object|
+                mapping.map do |field_attr, aggregate_attr|
+                  build(table.arel_attribute(field_attr), object.try!(aggregate_attr))
+                end.reduce(&:and)
+              end
+              queries.reduce(&:or)
             end
-            queries.reduce(&:or)
-          # FIXME: Deprecate this and provide a public API to force equality
-          elsif (value.is_a?(Range) || value.is_a?(Array)) &&
-            table.type(key.to_s).respond_to?(:subtype)
-            BasicObjectHandler.new(self).call(table.arel_attribute(key), value)
           else
             build(table.arel_attribute(key), value)
           end

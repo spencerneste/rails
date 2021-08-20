@@ -162,9 +162,10 @@ end
 class IntegrationTestUsesCorrectClass < ActionDispatch::IntegrationTest
   def test_integration_methods_called
     reset!
+    headers = { "Origin" => "*" }
 
     %w( get post head patch put delete ).each do |verb|
-      assert_nothing_raised { __send__(verb, "/") }
+      assert_nothing_raised { __send__(verb, "/", headers: headers) }
     end
   end
 end
@@ -1066,6 +1067,20 @@ class IntegrationRequestEncodersTest < ActionDispatch::IntegrationTest
       assert_equal "POST", request.method
       assert_equal "GET", request.headers["X-Http-Method-Override"]
       assert_equal({ "foo" => "heyo" }, response.parsed_body)
+    end
+  end
+
+  def test_get_request_with_json_excludes_null_query_string
+    with_routing do |routes|
+      routes.draw do
+        ActiveSupport::Deprecation.silence do
+          get ":action" => FooController
+        end
+      end
+
+      get "/foos_json", as: :json
+
+      assert_equal "http://www.example.com/foos_json", request.url
     end
   end
 

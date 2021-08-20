@@ -146,6 +146,10 @@ module Rails
         template "config/storage.yml"
       end
 
+      if options[:skip_sprockets] && !assets_config_exist
+        remove_file "config/initializers/assets.rb"
+      end
+
       unless rack_cors_config_exist
         remove_file "config/initializers/cors.rb"
       end
@@ -228,6 +232,7 @@ module Rails
 
     def tmp
       empty_directory_with_keep_file "tmp"
+      empty_directory_with_keep_file "tmp/pids"
       empty_directory "tmp/cache"
       empty_directory "tmp/cache/assets"
     end

@@ -441,8 +441,9 @@ class QueryCacheTest < ActiveRecord::TestCase
       assert_not ActiveRecord::Base.connection_handler.active_connections? # sanity check
 
       middleware {
-        assert ActiveRecord::Base.connection.query_cache_enabled, "QueryCache did not get lazily enabled"
+        assert_predicate ActiveRecord::Base.connection, :query_cache_enabled
       }.call({})
+      assert_not_predicate ActiveRecord::Base.connection, :query_cache_enabled
     end
   end
 
@@ -470,6 +471,23 @@ class QueryCacheTest < ActiveRecord::TestCase
         assert pool.connection.query_cache_enabled
       end
     }.call({})
+  end
+
+  def test_query_cache_is_enabled_in_threads_with_shared_connection
+    ActiveRecord::Base.connection_pool.lock_thread = true
+
+    assert_cache :off
+
+    thread_a = Thread.new do
+      middleware { |env|
+        assert_cache :clean
+        [200, {}, nil]
+      }.call({})
+    end
+
+    thread_a.join
+
+    ActiveRecord::Base.connection_pool.lock_thread = false
   end
 
   private
